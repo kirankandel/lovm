@@ -86,9 +86,15 @@ first `lovm install`.
 ```sh
 lovm install latest
 lovm default latest
+hash -r                   # zsh/bash: forget where soffice was before the shim existed
 which soffice             # ~/.lovm/bin/soffice
 soffice --version         # the version you just installed
 ```
+
+If you also have a system LibreOffice (for example `/usr/local/bin/soffice`) and your
+shell still runs it, it can crash with `DeploymentException`: when started by name, macOS
+LibreOffice finds its own files by searching `PATH`, and now finds lovm's shim first. Run
+`hash -r` or open a new terminal so `soffice` goes through the shim.
 
 ### Updating and removing lovm
 
