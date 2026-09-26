@@ -231,5 +231,3 @@ when you ask for it:
 LOVM_INTEGRATION=1 go test -run Integration -v -timeout 30m .
 LOVM_INTEGRATION=1 LOVM_INTEGRATION_VERSIONS="6.4 24.8" go test -run Integration -v -timeout 40m .
 ```
-
-Design notes: [`docs/superpowers/specs/2026-09-24-lovm-design.md`](docs/superpowers/specs/2026-09-24-lovm-design.md).
