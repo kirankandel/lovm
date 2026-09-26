@@ -67,6 +67,10 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		return errs.UnsupportedOS(a.Platform.OS)
 	}
 	switch cmd {
+	case "ls-remote":
+		return a.lsRemote(ctx, rest)
+	case "install":
+		return a.install(ctx, rest)
 	case "uninstall":
 		return a.uninstall(rest)
 	case "ls":

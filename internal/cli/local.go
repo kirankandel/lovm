@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/kirankandel/lovm/internal/errs"
 	"github.com/kirankandel/lovm/internal/home"
@@ -169,11 +170,13 @@ func (a *App) exec(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	cmd := exec.CommandContext(ctx, args[2], args[3:]...)
-	cmd.Env = append(os.Environ(),
-		"LOVM_VERSION="+b.String(),
-		"PATH="+a.Home.BinDir()+string(os.PathListSeparator)+a.Getenv("PATH"),
-	)
+	childPath := a.Home.BinDir() + string(os.PathListSeparator) + a.Getenv("PATH")
+	name, err := lookPathIn(args[2], childPath)
+	if err != nil {
+		return err
+	}
+	cmd := exec.CommandContext(ctx, name, args[3:]...)
+	cmd.Env = append(os.Environ(), "LOVM_VERSION="+b.String(), "PATH="+childPath)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = a.In, a.Out, a.Err
 	err = cmd.Run()
 	var exitErr *exec.ExitError
@@ -181,6 +184,25 @@ func (a *App) exec(ctx context.Context, args []string) error {
 		return errs.ChildExit(exitErr.ExitCode())
 	}
 	return err
+}
+
+// lookPathIn finds an executable the way a shell with the given PATH would.
+// exec.LookPath can't be used: it searches lovm's own PATH, which lacks the
+// shim directory prepended for the child and so could pick a system soffice.
+func lookPathIn(name, pathList string) (string, error) {
+	if strings.ContainsRune(name, os.PathSeparator) {
+		return name, nil
+	}
+	for _, dir := range filepath.SplitList(pathList) {
+		if dir == "" {
+			dir = "."
+		}
+		path := filepath.Join(dir, name)
+		if info, err := os.Stat(path); err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0o111 != 0 {
+			return path, nil
+		}
+	}
+	return "", fmt.Errorf("%s: command not found", name)
 }
 
 func (a *App) installedBuild(spec version.Spec) (version.Build, error) {

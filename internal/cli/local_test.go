@@ -156,3 +156,32 @@ func TestExec(t *testing.T) {
 	wantCode(t, run(app, "exec", "24.8", "--", "sh", "-c", "exit 3"), 3)
 	wantCode(t, run(app, "exec", "24.8", "sh"), errs.CodeUsage)
 }
+
+// A system LibreOffice on lovm's own PATH must not win over the shim: exec
+// has to resolve the command with the PATH it gives the child.
+func TestExecPrefersShimOverSystemSoffice(t *testing.T) {
+	app, out, _ := newTestApp(t)
+	fakeInstall(t, app.Home, "24.8.7.2")
+	writeScript(t, filepath.Join(app.Home.BinDir(), "soffice"), "echo shim")
+	decoyDir := t.TempDir()
+	writeScript(t, filepath.Join(decoyDir, "soffice"), "echo system")
+	t.Setenv("PATH", decoyDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	app.Getenv = func(k string) string { return os.Getenv(k) }
+
+	if err := run(app, "exec", "24.8", "--", "soffice"); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(out.String()); got != "shim" {
+		t.Errorf("exec ran %q, want the shim", got)
+	}
+}
+
+func writeScript(t *testing.T, path, body string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("#!/bin/sh\n"+body+"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
