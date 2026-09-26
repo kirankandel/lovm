@@ -26,6 +26,7 @@ Commands:
   which [version]                          print the path of the real soffice
   exec <version> -- <command> [args...]    run a command with that version active
   cache clear                              delete cached downloads and version lists
+  version                                  print lovm's version
 
 Versions: latest, fresh, still, 24.8, 24.8.4 or 24.8.4.2
 `
@@ -38,10 +39,11 @@ type App struct {
 	Getenv   func(string) string
 	Cwd      string
 	Platform platform.Platform
+	Version  string
 }
 
 // Run builds an App for the real environment and runs one command.
-func Run(ctx context.Context, args []string) error {
+func Run(ctx context.Context, args []string, version string) error {
 	h, err := home.Default()
 	if err != nil {
 		return err
@@ -50,7 +52,7 @@ func Run(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	app := &App{Home: h, In: os.Stdin, Out: os.Stdout, Err: os.Stderr, Getenv: os.Getenv, Cwd: cwd, Platform: platform.Current()}
+	app := &App{Home: h, In: os.Stdin, Out: os.Stdout, Err: os.Stderr, Getenv: os.Getenv, Cwd: cwd, Platform: platform.Current(), Version: version}
 	return app.Run(ctx, args)
 }
 
@@ -59,8 +61,12 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		return errs.Usage("no command given")
 	}
 	cmd, rest := args[0], args[1:]
-	if cmd == "help" || cmd == "-h" || cmd == "--help" {
+	switch cmd {
+	case "help", "-h", "--help":
 		fmt.Fprint(a.Out, usage)
+		return nil
+	case "version", "--version":
+		fmt.Fprintf(a.Out, "lovm %s\n", a.Version)
 		return nil
 	}
 	if a.Platform.OS != "linux" && a.Platform.OS != "darwin" {

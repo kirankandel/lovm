@@ -69,6 +69,21 @@ func TestUnknownCommandAndOS(t *testing.T) {
 	wantCode(t, run(app, "ls"), errs.CodeUnsupportedOS)
 }
 
+func TestVersion(t *testing.T) {
+	app, out, _ := newTestApp(t)
+	app.Version = "v0.1.0"
+	app.Platform = platform.Platform{OS: "windows", Arch: "amd64"} // works even where nothing else does
+	for _, arg := range []string{"version", "--version"} {
+		out.Reset()
+		if err := run(app, arg); err != nil {
+			t.Fatalf("%s: %v", arg, err)
+		}
+		if out.String() != "lovm v0.1.0\n" {
+			t.Errorf("%s printed %q", arg, out.String())
+		}
+	}
+}
+
 func TestUseWritesLovmrc(t *testing.T) {
 	app, _, errOut := newTestApp(t)
 	if err := run(app, "use", "24.8"); err != nil {

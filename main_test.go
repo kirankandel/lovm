@@ -28,6 +28,13 @@ func TestReport(t *testing.T) {
 	}
 }
 
+// Test binaries have no release version stamped in, so this pins the fallback.
+func TestBuildVersionDefaultsToDev(t *testing.T) {
+	if got := buildVersion(); got != "dev" {
+		t.Errorf("buildVersion() = %q, want dev", got)
+	}
+}
+
 func TestInvokedAs(t *testing.T) {
 	tests := map[string]string{"/home/u/.lovm/bin/soffice": "soffice", "/x/soffice.exe": "soffice", "/usr/local/bin/lovm": "lovm"}
 	for arg0, want := range tests {
