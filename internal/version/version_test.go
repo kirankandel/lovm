@@ -139,6 +139,24 @@ func TestSpecProperties(t *testing.T) {
 	}
 }
 
+func TestChannelSpecs(t *testing.T) {
+	for _, name := range []string{"fresh", "still"} {
+		s := mustSpec(t, " "+name+"\n")
+		if s.String() != name || s.Channel() != name {
+			t.Errorf("%s: String() = %q, Channel() = %q", name, s.String(), s.Channel())
+		}
+		if s.IsExact() || s.BelowFloor() {
+			t.Errorf("%s: IsExact = %v, BelowFloor = %v; want both false", name, s.IsExact(), s.BelowFloor())
+		}
+		if s.Matches(Build{26, 8, 0, 3}) {
+			t.Errorf("%s matched a build directly; channels must be expanded to a branch first", name)
+		}
+	}
+	if got := mustSpec(t, "24.8").Channel(); got != "" {
+		t.Errorf("24.8.Channel() = %q, want empty", got)
+	}
+}
+
 func mustSpec(t *testing.T, s string) Spec {
 	t.Helper()
 	spec, err := ParseSpec(s)

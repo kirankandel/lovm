@@ -33,6 +33,9 @@ func (a *App) install(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	if spec, err = view.Catalog.Expand(spec); err != nil {
+		return err
+	}
 	res, err := a.resolver(view).Resolve(ctx, spec)
 	a.saveLookups(view)
 	if err != nil {
@@ -66,9 +69,13 @@ func (a *App) lsRemote(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	spec, err := view.Catalog.Expand(opts.spec)
+	if err != nil {
+		return err
+	}
 	var builds []version.Build
 	for _, b := range view.AllBuilds() {
-		if opts.spec.Matches(b) && (opts.all || view.IsRelease(b)) {
+		if spec.Matches(b) && (opts.all || view.IsRelease(b)) {
 			builds = append(builds, b)
 		}
 	}

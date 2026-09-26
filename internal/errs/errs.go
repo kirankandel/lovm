@@ -21,6 +21,7 @@ const (
 	CodeWontRun         = 9
 	CodeNotSelected     = 10
 	CodeNotInstalled    = 11
+	CodeChannelUnknown  = 12
 )
 
 // Error is a failure lovm explains: Msg says what went wrong, Hint what to do.
@@ -111,6 +112,16 @@ func NotInstalled(spec, origin string) *Error {
 		msg = fmt.Sprintf("%s is pinned by %s but not installed", spec, origin)
 	}
 	return &Error{Code: CodeNotInstalled, Msg: msg, Hint: "Run: lovm install " + spec}
+}
+
+// ChannelUnknown reports a "fresh"/"still" spec that can't be mapped to a
+// branch: no version list is cached yet, or TDF currently maintains one branch.
+func ChannelUnknown(channel string) *Error {
+	return &Error{
+		Code: CodeChannelUnknown,
+		Msg:  fmt.Sprintf("don't know which LibreOffice branch is %q", channel),
+		Hint: "Refresh the version list with: lovm ls-remote --refresh",
+	}
 }
 
 // ChildExit carries the exit status of a command run by `lovm exec`.

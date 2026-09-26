@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/kirankandel/lovm/internal/archive"
+	"github.com/kirankandel/lovm/internal/errs"
 	"github.com/kirankandel/lovm/internal/platform"
 	"github.com/kirankandel/lovm/internal/version"
 )
@@ -56,6 +57,31 @@ func (c *Catalog) Channel(b version.Build) string {
 		}
 	}
 	return channel
+}
+
+// Expand turns a "fresh"/"still" spec into its branch, e.g. still → 26.2.
+// Other specs are returned unchanged.
+func (c *Catalog) Expand(spec version.Spec) (version.Spec, error) {
+	var branch string
+	switch spec.Channel() {
+	case "":
+		return spec, nil
+	case "fresh":
+		branch = c.FreshBranch
+	case "still":
+		branch = c.StillBranch
+	}
+	if branch == "" {
+		return version.Spec{}, errs.ChannelUnknown(spec.Channel())
+	}
+	return version.ParseSpec(branch)
+}
+
+// ReadCached returns the catalog saved by the last Load without touching the
+// network, for commands that must work offline such as the shim. It returns
+// an fs.ErrNotExist error when nothing has been cached yet.
+func ReadCached(cacheDir string) (*Catalog, error) {
+	return readCatalog(filepath.Join(cacheDir, "catalog.json"))
 }
 
 // Load returns the cached catalog, refetching it when it is older than a day

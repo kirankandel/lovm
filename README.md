@@ -145,6 +145,8 @@ lovm exec 24.8 -- soffice --headless --convert-to pdf report.docx
 | You type | You get |
 | --- | --- |
 | `latest` | Newest release available for your platform |
+| `fresh` | Newest release of TDF's **fresh** branch (newest features) |
+| `still` | Newest release of TDF's **still** branch (the more mature one TDF recommends for conservative users) |
 | `24.8` | Newest `24.8.x` release available for your platform |
 | `24.8.4` | The 24.8.4 release |
 | `24.8.4.2` | Exactly that build, even a release candidate |
@@ -152,6 +154,9 @@ lovm exec 24.8 -- soffice --headless --convert-to pdf report.docx
 Release candidates never match partial specs or `latest`, so `lovm install 26.8` can't
 give you an RC by accident. To test an RC, name its full build number
 (`lovm ls-remote 26.8 --all` lists them).
+
+`ls-remote` marks the current fresh and still releases. They are the two branches
+libreoffice.org offers for download; LibreOffice itself has no LTS releases.
 
 ## How the active version is chosen
 
@@ -165,8 +170,9 @@ It then runs the newest installed build matching that spec. If nothing is select
 selected version isn't installed, it fails with a clear message. **It never falls back to
 a system LibreOffice**, so you can't reproduce a bug on the wrong version by accident.
 
-`.lovmrc` holds one line such as `24.8` (follows new 24.8.x installs) or `24.8.4.2`
-(exact).
+`.lovmrc` holds one line such as `24.8` (follows new 24.8.x installs), `24.8.4.2`
+(exact) or `still` (follows TDF's still branch as of the last time lovm fetched the
+version list; any `install` or `ls-remote` refreshes it).
 
 ## Separate profiles
 
@@ -195,6 +201,7 @@ scripts can tell them apart:
 | 9 | Unpacked, but LibreOffice won't start on this system (its output is shown) |
 | 10 | No version selected |
 | 11 | Selected version not installed |
+| 12 | `fresh`/`still` can't be mapped to a branch yet (run `lovm ls-remote --refresh`) |
 
 `lovm exec` exits with the command's own exit code.
 

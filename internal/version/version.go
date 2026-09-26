@@ -51,22 +51,26 @@ func (b *Build) UnmarshalText(text []byte) error {
 	return nil
 }
 
-// Spec selects one or more builds: "latest", "24.8", "24.8.4" or "24.8.4.2".
-// Create it with ParseSpec.
+// Spec selects one or more builds: "latest", "fresh", "still", "24.8",
+// "24.8.4" or "24.8.4.2". Create it with ParseSpec.
 type Spec struct {
-	latest bool
-	parts  []int
+	latest  bool
+	channel string // "fresh" or "still"; expanded to a branch by the catalog
+	parts   []int
 }
 
 // ParseSpec parses a user-supplied version spec, ignoring surrounding whitespace.
 func ParseSpec(s string) (Spec, error) {
 	s = strings.TrimSpace(s)
-	if s == "latest" {
+	switch s {
+	case "latest":
 		return Spec{latest: true}, nil
+	case "fresh", "still":
+		return Spec{channel: s}, nil
 	}
 	parts, err := parseParts(s)
 	if err != nil || len(parts) < 2 || len(parts) > 4 {
-		return Spec{}, fmt.Errorf("invalid version %q: use latest, 24.8, 24.8.4 or 24.8.4.2", s)
+		return Spec{}, fmt.Errorf("invalid version %q: use latest, fresh, still, 24.8, 24.8.4 or 24.8.4.2", s)
 	}
 	return Spec{parts: parts}, nil
 }
@@ -74,6 +78,9 @@ func ParseSpec(s string) (Spec, error) {
 func (s Spec) String() string {
 	if s.latest {
 		return "latest"
+	}
+	if s.channel != "" {
+		return s.channel
 	}
 	strs := make([]string, len(s.parts))
 	for i, p := range s.parts {
@@ -85,13 +92,20 @@ func (s Spec) String() string {
 // IsExact reports whether the spec names one four-part build.
 func (s Spec) IsExact() bool { return len(s.parts) == 4 }
 
-// BelowFloor reports whether the spec asks for a version older than MinMajor.
-func (s Spec) BelowFloor() bool { return !s.latest && s.parts[0] < MinMajor }
+// Channel returns "fresh" or "still" for a channel spec, and "" otherwise.
+func (s Spec) Channel() string { return s.channel }
 
-// Matches reports whether b falls under the spec.
+// BelowFloor reports whether the spec asks for a version older than MinMajor.
+func (s Spec) BelowFloor() bool { return len(s.parts) > 0 && s.parts[0] < MinMajor }
+
+// Matches reports whether b falls under the spec. A channel spec matches
+// nothing: which branch it means comes from the catalog, so expand it first.
 func (s Spec) Matches(b Build) bool {
 	if s.latest {
 		return true
+	}
+	if s.channel != "" {
+		return false
 	}
 	return slices.Equal(s.parts, b[:len(s.parts)])
 }

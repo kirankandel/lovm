@@ -27,7 +27,7 @@ Commands:
   exec <version> -- <command> [args...]    run a command with that version active
   cache clear                              delete cached downloads and version lists
 
-Versions: latest, 24.8, 24.8.4 or 24.8.4.2
+Versions: latest, fresh, still, 24.8, 24.8.4 or 24.8.4.2
 `
 
 // App holds everything a command touches, so tests can point it at temp dirs.

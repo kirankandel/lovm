@@ -84,6 +84,44 @@ func TestUseWritesLovmrc(t *testing.T) {
 	wantCode(t, run(app, "use", "5.4"), errs.CodeBelowFloor)
 }
 
+func TestChannelSpecsInLocalCommands(t *testing.T) {
+	app, out, errOut := newTestApp(t)
+	fakeInstall(t, app.Home, "26.2.6.3", "26.8.0.3")
+
+	// Pinning a channel works before any version list is cached; it just can't say which branch yet.
+	if err := run(app, "use", "still"); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(filepath.Join(app.Cwd, selector.RCFile)); string(data) != "still\n" {
+		t.Errorf(".lovmrc = %q", data)
+	}
+	if !strings.Contains(errOut.String(), "lovm ls-remote") {
+		t.Errorf("stderr = %q, want a hint to fetch the version list", errOut.String())
+	}
+
+	catalogJSON := `{"fetched_at":"2026-09-26T00:00:00Z","builds":[],"releases":{},"fresh_branch":"26.8","still_branch":"26.2"}`
+	if err := os.MkdirAll(app.Home.CacheDir(), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(app.Home.CacheDir(), "catalog.json"), []byte(catalogJSON), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	if err := run(app, "which", "fresh"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), filepath.Join("versions", "26.8.0.3")) {
+		t.Errorf("which fresh = %q, want the 26.8 install", out.String())
+	}
+	out.Reset()
+	if err := run(app, "current"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(out.String(), "26.2.6.3 (still from ") {
+		t.Errorf("current = %q", out.String())
+	}
+}
+
 func TestDefaultAndCurrent(t *testing.T) {
 	app, out, _ := newTestApp(t)
 	fakeInstall(t, app.Home, "24.8.4.2", "24.8.7.2")

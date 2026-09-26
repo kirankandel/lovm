@@ -20,13 +20,17 @@ func (a *App) uninstall(args []string) error {
 	if err != nil {
 		return err
 	}
+	expanded, err := selector.ExpandChannel(a.Home, spec)
+	if err != nil {
+		return err
+	}
 	installed, err := a.Home.Installed()
 	if err != nil {
 		return err
 	}
 	var matches []version.Build
 	for _, b := range installed {
-		if spec.Matches(b) {
+		if expanded.Matches(b) {
 			matches = append(matches, b)
 		}
 	}
@@ -106,11 +110,20 @@ func (a *App) setDefault(args []string) error {
 }
 
 func (a *App) noteIfNotInstalled(spec version.Spec) error {
+	expanded, err := selector.ExpandChannel(a.Home, spec)
+	var unknown *errs.Error
+	if errors.As(err, &unknown) && unknown.Code == errs.CodeChannelUnknown {
+		fmt.Fprintf(a.Err, "Note: %v. %s\n", err, unknown.Hint)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
 	installed, err := a.Home.Installed()
 	if err != nil {
 		return err
 	}
-	if _, ok := selector.PickInstalled(spec, installed); !ok {
+	if _, ok := selector.PickInstalled(expanded, installed); !ok {
 		fmt.Fprintf(a.Err, "Note: %s is not installed yet; run: lovm install %s\n", spec, spec)
 	}
 	return nil
@@ -206,11 +219,15 @@ func lookPathIn(name, pathList string) (string, error) {
 }
 
 func (a *App) installedBuild(spec version.Spec) (version.Build, error) {
+	expanded, err := selector.ExpandChannel(a.Home, spec)
+	if err != nil {
+		return version.Build{}, err
+	}
 	installed, err := a.Home.Installed()
 	if err != nil {
 		return version.Build{}, err
 	}
-	b, ok := selector.PickInstalled(spec, installed)
+	b, ok := selector.PickInstalled(expanded, installed)
 	if !ok {
 		return version.Build{}, errs.NotInstalled(spec.String(), "")
 	}

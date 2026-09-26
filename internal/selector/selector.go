@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/kirankandel/lovm/internal/catalog"
 	"github.com/kirankandel/lovm/internal/errs"
 	"github.com/kirankandel/lovm/internal/home"
 	"github.com/kirankandel/lovm/internal/version"
@@ -55,15 +56,36 @@ func Active(h home.Home, getenv func(string) string, cwd string) (version.Build,
 	if err != nil {
 		return version.Build{}, Selection{}, err
 	}
+	spec, err := ExpandChannel(h, sel.Spec)
+	if err != nil {
+		return version.Build{}, sel, err
+	}
 	installed, err := h.Installed()
 	if err != nil {
 		return version.Build{}, Selection{}, err
 	}
-	b, ok := PickInstalled(sel.Spec, installed)
+	b, ok := PickInstalled(spec, installed)
 	if !ok {
 		return version.Build{}, sel, errs.NotInstalled(sel.Spec.String(), sel.Origin)
 	}
 	return b, sel, nil
+}
+
+// ExpandChannel turns "fresh"/"still" into a branch using the version list
+// cached by the last online command, so it works offline. Other specs are
+// returned unchanged.
+func ExpandChannel(h home.Home, spec version.Spec) (version.Spec, error) {
+	if spec.Channel() == "" {
+		return spec, nil
+	}
+	cat, err := catalog.ReadCached(h.CacheDir())
+	if errors.Is(err, fs.ErrNotExist) {
+		return version.Spec{}, errs.ChannelUnknown(spec.Channel())
+	}
+	if err != nil {
+		return version.Spec{}, err
+	}
+	return cat.Expand(spec)
 }
 
 // PickInstalled returns the newest installed build matching spec. installed

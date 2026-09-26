@@ -106,6 +106,30 @@ func TestPickInstalled(t *testing.T) {
 	}
 }
 
+func TestActiveExpandsChannelFromCache(t *testing.T) {
+	h := home.Home{Root: t.TempDir()}
+	for _, b := range []string{"26.2.6.3", "26.8.0.3"} {
+		if err := os.MkdirAll(filepath.Join(h.VersionsDir(), b), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cwd := t.TempDir()
+	write(t, filepath.Join(cwd, RCFile), "still\n")
+
+	_, _, err := Active(h, env(nil), cwd)
+	wantCode(t, err, errs.CodeChannelUnknown) // nothing cached yet
+
+	write(t, filepath.Join(h.CacheDir(), "catalog.json"),
+		`{"fetched_at":"2026-09-26T00:00:00Z","builds":[],"releases":{},"fresh_branch":"26.8","still_branch":"26.2"}`)
+	b, sel, err := Active(h, env(nil), cwd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.String() != "26.2.6.3" || sel.Spec.String() != "still" {
+		t.Errorf("Active = %v from %s, want 26.2.6.3 from still", b, sel.Spec)
+	}
+}
+
 func TestActiveNotInstalled(t *testing.T) {
 	h := home.Home{Root: t.TempDir()}
 	cwd := t.TempDir()

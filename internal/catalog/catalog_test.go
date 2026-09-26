@@ -3,6 +3,7 @@ package catalog
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/kirankandel/lovm/internal/archive"
+	"github.com/kirankandel/lovm/internal/errs"
 	"github.com/kirankandel/lovm/internal/platform"
 	"github.com/kirankandel/lovm/internal/version"
 )
@@ -135,6 +137,50 @@ func TestCatalogChannel(t *testing.T) {
 		if got := cat.Channel(mustBuild(t, build)); got != want {
 			t.Errorf("Channel(%s) = %q, want %q", build, got, want)
 		}
+	}
+}
+
+func TestExpandChannel(t *testing.T) {
+	cat := &Catalog{FreshBranch: "26.8", StillBranch: "26.2"}
+	tests := map[string]string{"fresh": "26.8", "still": "26.2", "24.8": "24.8", "latest": "latest"}
+	for in, want := range tests {
+		spec, err := version.ParseSpec(in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := cat.Expand(spec)
+		if err != nil || got.String() != want {
+			t.Errorf("Expand(%s) = %v, %v; want %s", in, got, err, want)
+		}
+	}
+
+	still, err := version.ParseSpec("still")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, c := range map[string]*Catalog{
+		"one maintained branch": {FreshBranch: "26.8"},
+		"pre-channel catalog":   {},
+	} {
+		var e *errs.Error
+		if _, err := c.Expand(still); !errors.As(err, &e) || e.Code != errs.CodeChannelUnknown {
+			t.Errorf("%s: err = %v, want ChannelUnknown", name, err)
+		}
+	}
+}
+
+func TestReadCached(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := ReadCached(dir); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("no cache: err = %v, want fs.ErrNotExist", err)
+	}
+	remote := &fakeRemote{builds: mustBuilds(t, "26.8.0.3"), stable: []string{"26.8.0"}}
+	if _, _, err := Load(context.Background(), remote, dir, false, now); err != nil {
+		t.Fatal(err)
+	}
+	cat, err := ReadCached(dir)
+	if err != nil || cat.FreshBranch != "26.8" {
+		t.Fatalf("ReadCached = %+v, %v", cat, err)
 	}
 }
 
