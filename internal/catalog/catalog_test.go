@@ -115,6 +115,45 @@ func TestLoadRejectsCorruptCache(t *testing.T) {
 	}
 }
 
+func TestCatalogChannel(t *testing.T) {
+	remote := &fakeRemote{
+		builds: mustBuilds(t, "25.8.7.1", "26.2.5.2", "26.2.6.2", "26.8.0.3", "26.8.1.1"),
+		stable: []string{"25.8.7", "26.2.5", "26.2.6", "26.8.0"},
+	}
+	cat, _, err := Load(context.Background(), remote, t.TempDir(), false, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := map[string]string{
+		"26.8.0.3": "fresh", // newest release of the newest branch
+		"26.8.1.1": "",      // RC in that branch
+		"26.2.6.2": "still", // newest release of the previous branch
+		"26.2.5.2": "",      // older release in the still branch
+		"25.8.7.1": "",      // still in /stable/, but no longer offered
+	}
+	for build, want := range tests {
+		if got := cat.Channel(mustBuild(t, build)); got != want {
+			t.Errorf("Channel(%s) = %q, want %q", build, got, want)
+		}
+	}
+}
+
+func TestLoadRefreshesCatalogWithoutChannels(t *testing.T) {
+	dir := t.TempDir()
+	old := `{"fetched_at":"2026-09-24T12:00:00Z","builds":["24.8.7.2"],"releases":{"24.8.7.2":true}}`
+	if err := os.WriteFile(filepath.Join(dir, "catalog.json"), []byte(old), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	remote := &fakeRemote{builds: mustBuilds(t, "24.8.7.2"), stable: []string{"24.8.7"}}
+	cat, _, err := Load(context.Background(), remote, dir, false, now.Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if remote.fetches != 1 || cat.FreshBranch != "24.8" {
+		t.Errorf("fetches = %d, FreshBranch = %q; want a refetch that fills in channels", remote.fetches, cat.FreshBranch)
+	}
+}
+
 func TestInstallersMemoiseLookups(t *testing.T) {
 	ctx, dir := context.Background(), t.TempDir()
 	b := mustBuild(t, "24.8.7.2")

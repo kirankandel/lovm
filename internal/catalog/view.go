@@ -18,6 +18,9 @@ func (v View) AllBuilds() []version.Build { return v.Catalog.Builds }
 
 func (v View) IsRelease(b version.Build) bool { return v.Catalog.Releases[b] }
 
+// Channel returns "fresh", "still" or "" for b; see Catalog.Channel.
+func (v View) Channel(b version.Build) string { return v.Catalog.Channel(b) }
+
 func (v View) FindInstaller(ctx context.Context, b version.Build, p platform.Platform) (archive.Installer, bool, error) {
 	return v.Installers.Find(ctx, b, p)
 }

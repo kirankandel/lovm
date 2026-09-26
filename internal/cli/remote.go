@@ -83,6 +83,9 @@ func (a *App) lsRemote(ctx context.Context, args []string) error {
 	}
 	for i, b := range builds {
 		var notes []string
+		if channel := view.Channel(b); channel != "" {
+			notes = append(notes, channel)
+		}
 		if !view.IsRelease(b) {
 			notes = append(notes, "RC")
 		}

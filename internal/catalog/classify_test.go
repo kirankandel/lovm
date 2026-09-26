@@ -26,6 +26,27 @@ func TestNewStableInfo(t *testing.T) {
 	}
 }
 
+// The download page on libreoffice.org offers the two newest branches in
+// /stable/ (checked 2026-09-26: 26.8 "latest", 26.2 "previous"); 25.8 lingers
+// in /stable/ but is no longer offered.
+func TestStableChannels(t *testing.T) {
+	info, err := newStableInfo([]string{"25.8.7", "26.2.5", "26.2.6", "26.8.0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fresh, still := info.channels(); fresh != "26.8" || still != "26.2" {
+		t.Errorf("channels() = %q, %q; want 26.8, 26.2", fresh, still)
+	}
+
+	single, err := newStableInfo([]string{"26.8.0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fresh, still := single.channels(); fresh != "26.8" || still != "" {
+		t.Errorf("single branch: channels() = %q, %q; want 26.8, empty", fresh, still)
+	}
+}
+
 func TestClassifyReleases(t *testing.T) {
 	stable, err := newStableInfo([]string{"25.8.7", "26.2.5", "26.2.6", "26.8.0"})
 	if err != nil {

@@ -25,11 +25,37 @@ type Remote interface {
 	FindInstaller(ctx context.Context, b version.Build, p platform.Platform) (archive.Installer, bool, error)
 }
 
-// Catalog lists every supported build in the archive and which are releases.
+// Catalog lists every supported build in the archive, which are releases, and
+// which branches TDF currently offers as "fresh" and "still".
 type Catalog struct {
-	FetchedAt time.Time              `json:"fetched_at"`
-	Builds    []version.Build        `json:"builds"` // oldest first
-	Releases  map[version.Build]bool `json:"releases"`
+	FetchedAt   time.Time              `json:"fetched_at"`
+	Builds      []version.Build        `json:"builds"` // oldest first
+	Releases    map[version.Build]bool `json:"releases"`
+	FreshBranch string                 `json:"fresh_branch"` // e.g. "26.8"
+	StillBranch string                 `json:"still_branch"` // e.g. "26.2"; empty if only one branch is maintained
+}
+
+// Channel returns "fresh" or "still" when b is the newest release of the
+// branch TDF offers under that name, and "" for every other build.
+func (c *Catalog) Channel(b version.Build) string {
+	var channel string
+	switch b.Branch() {
+	case c.FreshBranch:
+		channel = "fresh"
+	case c.StillBranch:
+		channel = "still"
+	default:
+		return ""
+	}
+	if !c.Releases[b] {
+		return ""
+	}
+	for _, other := range c.Builds {
+		if other.Branch() == b.Branch() && c.Releases[other] && other.Compare(b) > 0 {
+			return ""
+		}
+	}
+	return channel
 }
 
 // Load returns the cached catalog, refetching it when it is older than a day
@@ -41,7 +67,8 @@ func Load(ctx context.Context, remote Remote, cacheDir string, refresh bool, now
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return nil, "", err
 	}
-	if cached != nil && !refresh && now.Sub(cached.FetchedAt) < catalogTTL {
+	// A catalog without FreshBranch was written before channels existed; refetch it.
+	if cached != nil && !refresh && cached.FreshBranch != "" && now.Sub(cached.FetchedAt) < catalogTTL {
 		return cached, "", nil
 	}
 	fresh, err := fetch(ctx, remote, now)
@@ -90,5 +117,12 @@ func fetch(ctx context.Context, remote Remote, now time.Time) (*Catalog, error) 
 			builds = append(builds, b)
 		}
 	}
-	return &Catalog{FetchedAt: now, Builds: builds, Releases: classifyReleases(builds, stable)}, nil
+	fresh, still := stable.channels()
+	return &Catalog{
+		FetchedAt:   now,
+		Builds:      builds,
+		Releases:    classifyReleases(builds, stable),
+		FreshBranch: fresh,
+		StillBranch: still,
+	}, nil
 }
