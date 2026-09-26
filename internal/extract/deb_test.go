@@ -132,11 +132,17 @@ func TestDebTarballExtractsGzipAndXzDebs(t *testing.T) {
 	menus := debBytes(arMember{"data.tar.gz", gzipBytes(t, tarBytes(t,
 		tarEntry{name: "./usr/bin/libreoffice24.8", body: "x"},
 	))})
+	// Real LibreOffice tarballs ship this package directly in DEBS/, full of
+	// absolute symlinks into /opt for system menus and launchers.
+	debianMenus := debBytes(arMember{"data.tar.xz", xzBytes(t, tarBytes(t,
+		tarEntry{name: "./usr/local/bin/libreoffice24.8", link: "/opt/libreoffice24.8/program/soffice"},
+	))})
 
 	tarball := writeTarball(t,
 		tarEntry{name: top + "readmes/README_en-US", body: "readme"},
 		tarEntry{name: top + "DEBS/core.deb", body: string(core)},
 		tarEntry{name: top + "DEBS/calc.deb", body: string(calc)},
+		tarEntry{name: top + "DEBS/libreoffice24.8-debian-menus_24.8.7-2_all.deb", body: string(debianMenus)},
 		tarEntry{name: top + "DEBS/desktop-integration/menus.deb", body: string(menus)},
 	)
 	dest := t.TempDir()

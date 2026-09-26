@@ -17,8 +17,8 @@ import (
 
 // DebTarball unpacks every .deb directly inside the DEBS folder of a
 // LibreOffice "_deb.tar.gz" into dest, giving dest/opt/libreofficeX.Y/...
-// Debs in subfolders (desktop-integration) are skipped: they only add system
-// menu entries and point at absolute paths.
+// Desktop-integration packages are skipped: they only add system menu
+// entries and launchers, as absolute symlinks into /opt.
 func DebTarball(tarGzPath, dest string) error {
 	f, err := os.Open(tarGzPath)
 	if err != nil {
@@ -55,8 +55,12 @@ func DebTarball(tarGzPath, dest string) error {
 	return nil
 }
 
+// isTopLevelDeb reports whether name is a package lovm needs: a .deb directly
+// in DEBS/, excluding the libreofficeX.Y-debian-menus package that ships there.
 func isTopLevelDeb(name string) bool {
-	return strings.HasSuffix(name, ".deb") && path.Base(path.Dir(name)) == "DEBS"
+	return strings.HasSuffix(name, ".deb") &&
+		path.Base(path.Dir(name)) == "DEBS" &&
+		!strings.Contains(path.Base(name), "-debian-menus_")
 }
 
 const arMagic = "!<arch>\n"
