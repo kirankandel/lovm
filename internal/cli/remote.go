@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -208,7 +207,7 @@ func (a *App) saveLookups(view catalog.View) {
 	}
 }
 
-// ensureShim points bin/soffice at the running lovm binary; invoked under
+// ensureShim makes bin/soffice run the current lovm binary; invoked under
 // that name, lovm acts as the shim.
 func (a *App) ensureShim() error {
 	self, err := os.Executable()
@@ -218,22 +217,21 @@ func (a *App) ensureShim() error {
 	if self, err = filepath.EvalSymlinks(self); err != nil {
 		return err
 	}
-	link := filepath.Join(a.Home.BinDir(), "soffice")
-	if current, err := os.Readlink(link); err == nil && current == self {
-		return nil
-	}
-	if err := os.MkdirAll(a.Home.BinDir(), 0o755); err != nil {
-		return err
-	}
-	if err := os.Remove(link); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return err
-	}
-	return os.Symlink(self, link)
+	return installShim(self, a.Home.BinDir())
 }
 
 func (a *App) printPathHint() {
-	if slices.Contains(filepath.SplitList(a.Getenv("PATH")), a.Home.BinDir()) {
+	bin := a.Home.BinDir()
+	windows := a.Platform.OS == "windows"
+	for _, dir := range filepath.SplitList(a.Getenv("PATH")) {
+		if dir == bin || (windows && strings.EqualFold(dir, bin)) {
+			return
+		}
+	}
+	if windows {
+		fmt.Fprintf(a.Out, "\nAdd lovm's shim to your PATH (PowerShell), then open a new terminal:\n"+
+			"  [Environment]::SetEnvironmentVariable(\"Path\", \"%s;\" + [Environment]::GetEnvironmentVariable(\"Path\", \"User\"), \"User\")\n", bin)
 		return
 	}
-	fmt.Fprintf(a.Out, "\nAdd lovm's shim to your PATH (e.g. in ~/.zshrc):\n  export PATH=\"%s:$PATH\"\n", a.Home.BinDir())
+	fmt.Fprintf(a.Out, "\nAdd lovm's shim to your PATH (e.g. in ~/.zshrc):\n  export PATH=\"%s:$PATH\"\n", bin)
 }

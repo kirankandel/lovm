@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/kirankandel/lovm/internal/errs"
 	"github.com/kirankandel/lovm/internal/version"
@@ -92,13 +93,38 @@ func SofficePath(installDir, goos string) (string, error) {
 			return "", fmt.Errorf("expected one soffice under %s, found %d", installDir, len(matches))
 		}
 		return matches[0], nil
+	case "windows":
+		return windowsSoffice(installDir)
 	default:
 		return "", errs.UnsupportedOS(goos)
 	}
 }
 
+// windowsSoffice finds program\soffice.com, the console launcher: soffice.exe
+// is a GUI program, so its output never reaches a terminal and callers could
+// not see --version or conversion errors. The folder above program\ comes
+// from the MSI and differs between versions, so a shallow search finds it.
+func windowsSoffice(installDir string) (string, error) {
+	var matches []string
+	for _, pattern := range []string{"program", "*/program", "*/*/program"} {
+		found, err := filepath.Glob(filepath.Join(installDir, pattern, "soffice.com"))
+		if err != nil {
+			return "", err
+		}
+		matches = append(matches, found...)
+	}
+	if len(matches) != 1 {
+		return "", fmt.Errorf("expected one soffice.com under %s, found %d", installDir, len(matches))
+	}
+	return matches[0], nil
+}
+
 // FileURL turns an absolute path into the file:// URL LibreOffice expects,
 // percent-encoding characters such as spaces.
 func FileURL(path string) string {
-	return (&url.URL{Scheme: "file", Path: filepath.ToSlash(path)}).String()
+	p := filepath.ToSlash(path)
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p // "C:/x" must become file:///C:/x, not a URL with host "C:"
+	}
+	return (&url.URL{Scheme: "file", Path: p}).String()
 }

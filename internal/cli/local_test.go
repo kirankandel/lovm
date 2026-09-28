@@ -65,14 +65,19 @@ func TestUnknownCommandAndOS(t *testing.T) {
 	wantCode(t, run(app, "frobnicate"), errs.CodeUsage)
 	wantCode(t, run(app), errs.CodeUsage)
 
-	app.Platform = platform.Platform{OS: "windows", Arch: "amd64"}
+	app.Platform = platform.Platform{OS: "freebsd", Arch: "amd64"}
 	wantCode(t, run(app, "ls"), errs.CodeUnsupportedOS)
+
+	app.Platform = platform.Platform{OS: "windows", Arch: "amd64"}
+	if err := run(app, "ls"); err != nil {
+		t.Errorf("windows ls: %v", err)
+	}
 }
 
 func TestVersion(t *testing.T) {
 	app, out, _ := newTestApp(t)
 	app.Version = "v0.1.0"
-	app.Platform = platform.Platform{OS: "windows", Arch: "amd64"} // works even where nothing else does
+	app.Platform = platform.Platform{OS: "freebsd", Arch: "amd64"} // works even where nothing else does
 	for _, arg := range []string{"version", "--version"} {
 		out.Reset()
 		if err := run(app, arg); err != nil {
@@ -199,14 +204,14 @@ func TestWhich(t *testing.T) {
 func TestExec(t *testing.T) {
 	app, out, _ := newTestApp(t)
 	fakeInstall(t, app.Home, "24.8.7.2")
-	if err := run(app, "exec", "24.8", "--", "sh", "-c", `echo "$LOVM_VERSION"; echo "$PATH"`); err != nil {
+	if err := run(app, append([]string{"exec", "24.8", "--"}, printVersionAndPath...)...); err != nil {
 		t.Fatal(err)
 	}
-	lines := strings.Split(out.String(), "\n")
+	lines := strings.Split(strings.ReplaceAll(out.String(), "\r\n", "\n"), "\n")
 	if lines[0] != "24.8.7.2" || !strings.HasPrefix(lines[1], app.Home.BinDir()+string(os.PathListSeparator)) {
 		t.Errorf("exec output = %q", out.String())
 	}
-	wantCode(t, run(app, "exec", "24.8", "--", "sh", "-c", "exit 3"), 3)
+	wantCode(t, run(app, append([]string{"exec", "24.8", "--"}, exitThree...)...), 3)
 	wantCode(t, run(app, "exec", "24.8", "sh"), errs.CodeUsage)
 }
 
@@ -215,9 +220,9 @@ func TestExec(t *testing.T) {
 func TestExecPrefersShimOverSystemSoffice(t *testing.T) {
 	app, out, _ := newTestApp(t)
 	fakeInstall(t, app.Home, "24.8.7.2")
-	writeScript(t, filepath.Join(app.Home.BinDir(), "soffice"), "echo shim")
+	writeFakeCommand(t, app.Home.BinDir(), "soffice", "shim")
 	decoyDir := t.TempDir()
-	writeScript(t, filepath.Join(decoyDir, "soffice"), "echo system")
+	writeFakeCommand(t, decoyDir, "soffice", "system")
 	t.Setenv("PATH", decoyDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	app.Getenv = func(k string) string { return os.Getenv(k) }
 
@@ -226,15 +231,5 @@ func TestExecPrefersShimOverSystemSoffice(t *testing.T) {
 	}
 	if got := strings.TrimSpace(out.String()); got != "shim" {
 		t.Errorf("exec ran %q, want the shim", got)
-	}
-}
-
-func writeScript(t *testing.T, path, body string) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte("#!/bin/sh\n"+body+"\n"), 0o755); err != nil {
-		t.Fatal(err)
 	}
 }

@@ -9,9 +9,10 @@ No root or admin rights needed. Everything lives in `~/.lovm`.
 
 |  |  |
 | --- | --- |
-| Platforms | Linux and macOS, x86_64 and arm64. Windows is planned. |
+| Platforms | Linux, macOS and Windows, x86_64 and arm64. Windows support is new and less tested. |
 | Versions | Official releases from 6.0 onwards, from the [LibreOffice archive](https://downloadarchive.documentfoundation.org/libreoffice/old/) |
 | Apple Silicon | Versions before 7.2 have no native build; the x86_64 build runs under Rosetta 2 |
+| Windows on ARM | Only 7.4 and newer, the versions with an ARM build |
 
 ### Linux system libraries
 
@@ -95,6 +96,36 @@ If you also have a system LibreOffice (for example `/usr/local/bin/soffice`) and
 shell still runs it, it can crash with `DeploymentException`: when started by name, macOS
 LibreOffice finds its own files by searching `PATH`, and now finds lovm's shim first. Run
 `hash -r` or open a new terminal so `soffice` goes through the shim.
+
+### Windows
+
+In PowerShell:
+
+```powershell
+git clone <this repo> lovm
+cd lovm
+go install .                       # installs to %USERPROFILE%\go\bin, which the Go installer puts on PATH
+
+# Add lovm's shim directory to your user PATH, then open a new terminal
+[Environment]::SetEnvironmentVariable("Path", "$env:USERPROFILE\.lovm\bin;" + [Environment]::GetEnvironmentVariable("Path", "User"), "User")
+
+lovm install latest
+lovm default latest
+where.exe soffice                  # %USERPROFILE%\.lovm\bin\soffice.exe first
+soffice --version
+```
+
+Differences from Linux and macOS:
+
+- Installers are unpacked with `msiexec /a` (an "administrative install"): the files are
+  copied out without touching the registry, the Start menu or file associations, so it
+  needs no admin rights and doesn't interfere with a regular LibreOffice install.
+- The shim `~\.lovm\bin\soffice.exe` is a **copy** of `lovm.exe`, because symlinks need
+  admin rights on Windows. `lovm install` refreshes it; after updating lovm, run any
+  `lovm install` (e.g. of a version you already have) to update the shim.
+- The shim runs LibreOffice's `soffice.com`, the console launcher, so `--version` output and
+  conversion errors show up in the terminal (`soffice.exe` is a GUI program and prints
+  nothing).
 
 ### Updating and removing lovm
 
@@ -215,7 +246,7 @@ scripts can tell them apart:
 
 ```text
 ~/.lovm/                      override with LOVM_HOME
-  bin/soffice                 the shim (a symlink to lovm)
+  bin/soffice                 the shim (a symlink to lovm; soffice.exe, a copy, on Windows)
   default                     global default spec
   versions/<build>/
     install/                  the unpacked LibreOffice

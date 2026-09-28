@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 
 	"github.com/kirankandel/lovm/internal/errs"
 	"github.com/kirankandel/lovm/internal/home"
@@ -69,7 +70,7 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		fmt.Fprintf(a.Out, "lovm %s\n", a.Version)
 		return nil
 	}
-	if a.Platform.OS != "linux" && a.Platform.OS != "darwin" {
+	if !slices.Contains([]string{"linux", "darwin", "windows"}, a.Platform.OS) {
 		return errs.UnsupportedOS(a.Platform.OS)
 	}
 	switch cmd {

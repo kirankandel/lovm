@@ -38,6 +38,8 @@ func extractFor(ctx context.Context, goos, archivePath, dest string) error {
 		return extract.DebTarball(archivePath, dest)
 	case "darwin":
 		return extract.DMG(ctx, archivePath, dest)
+	case "windows":
+		return extract.MSI(ctx, archivePath, dest)
 	default:
 		return errs.UnsupportedOS(goos)
 	}

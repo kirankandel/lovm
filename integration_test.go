@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -22,6 +23,9 @@ func TestIntegrationInstallAndConvert(t *testing.T) {
 	}
 
 	bin := filepath.Join(t.TempDir(), "lovm")
+	if runtime.GOOS == "windows" {
+		bin += ".exe" // Windows only runs files with a program extension
+	}
 	if out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput(); err != nil {
 		t.Fatalf("go build: %v\n%s", err, out)
 	}

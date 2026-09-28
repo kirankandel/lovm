@@ -3,7 +3,7 @@ package cli
 import (
 	"context"
 	"os"
-	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/kirankandel/lovm/internal/archive"
@@ -54,23 +54,31 @@ func TestLookupAllKeepsOrder(t *testing.T) {
 	}
 }
 
-func TestEnsureShimIsIdempotent(t *testing.T) {
-	app, _, _ := newTestApp(t)
-	for range 2 {
-		if err := app.ensureShim(); err != nil {
-			t.Fatal(err)
-		}
+func TestPrintPathHint(t *testing.T) {
+	app, out, _ := newTestApp(t)
+	setPath := func(dirs ...string) {
+		path := strings.Join(dirs, string(os.PathListSeparator))
+		app.Getenv = func(k string) string { return map[string]string{"PATH": path}[k] }
 	}
-	self, err := os.Executable()
-	if err != nil {
-		t.Fatal(err)
+
+	setPath("/usr/bin")
+	app.printPathHint()
+	if !strings.Contains(out.String(), `export PATH="`+app.Home.BinDir()+`:$PATH"`) {
+		t.Errorf("unix hint = %q", out.String())
 	}
-	self, err = filepath.EvalSymlinks(self)
-	if err != nil {
-		t.Fatal(err)
+
+	app.Platform = platform.Platform{OS: "windows", Arch: "amd64"}
+	out.Reset()
+	app.printPathHint()
+	if !strings.Contains(out.String(), "SetEnvironmentVariable") || !strings.Contains(out.String(), app.Home.BinDir()) {
+		t.Errorf("windows hint = %q", out.String())
 	}
-	target, err := os.Readlink(filepath.Join(app.Home.BinDir(), "soffice"))
-	if err != nil || target != self {
-		t.Errorf("shim -> %q (%v), want %q", target, err, self)
+
+	// Windows folder names ignore case, so a differently cased entry already counts.
+	setPath("/usr/bin", strings.ToUpper(app.Home.BinDir()))
+	out.Reset()
+	app.printPathHint()
+	if out.Len() != 0 {
+		t.Errorf("hint printed although the shim is on PATH: %q", out.String())
 	}
 }

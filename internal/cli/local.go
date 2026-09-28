@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/kirankandel/lovm/internal/errs"
 	"github.com/kirankandel/lovm/internal/home"
@@ -203,16 +202,18 @@ func (a *App) exec(ctx context.Context, args []string) error {
 // exec.LookPath can't be used: it searches lovm's own PATH, which lacks the
 // shim directory prepended for the child and so could pick a system soffice.
 func lookPathIn(name, pathList string) (string, error) {
-	if strings.ContainsRune(name, os.PathSeparator) {
+	if filepath.Base(name) != name {
 		return name, nil
 	}
 	for _, dir := range filepath.SplitList(pathList) {
 		if dir == "" {
 			dir = "."
 		}
-		path := filepath.Join(dir, name)
-		if info, err := os.Stat(path); err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0o111 != 0 {
-			return path, nil
+		for _, candidate := range executableCandidates(name) {
+			path := filepath.Join(dir, candidate)
+			if info, err := os.Stat(path); err == nil && isExecutable(info) {
+				return path, nil
+			}
 		}
 	}
 	return "", fmt.Errorf("%s: command not found", name)
